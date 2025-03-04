@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FastAPI STT & TTS</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f4f4f4;
+            text-align: center;
+            padding: 20px;
+        }
+        .container {
+            max-width: 700px;
+            margin: auto;
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+        }
+        h1 {
+            color: #333;
+        }
+        .section {
+            margin-top: 20px;
+            padding: 15px;
+            border: 2px solid #007bff;
+            border-radius: 8px;
+            background-color: #f9f9f9;
+        }
+        input, textarea, button {
+            margin-top: 10px;
+            padding: 10px;
+            width: 80%;
+            font-size: 16px;
+        }
+        button {
+            cursor: pointer;
+            background: #007bff;
+            color: white;
+            border: none;
+            border-radius: 5px;
+        }
+        button:hover {
+            background: #0056b3;
+        }
+        audio {
+            margin-top: 15px;
+            width: 80%;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <h1>🎙️ FastAPI Speech-to-Text & Text-to-Speech</h1>
+
+        <!-- 🟢 STT Section -->
+        <div class="section">
+            <h2>🎤 Speech-to-Text (STT)</h2>
+            <p>Upload an audio file to transcribe the text.</p>
+            <input type="file" id="audioFile" required>
+            <button id="uploadFile">Upload & Transcribe</button>
+            <h3>✅ Transcription Result:</h3>
+            <p id="transcriptionResult">Your transcription will appear here...</p>
+        </div>
+
+        <!-- 🎙 Real-Time Recording -->
+        <div class="section">
+            <h2>🎤 Live Speech Recognition</h2>
+            <p>Record your voice and transcribe it in real-time.</p>
+            <button id="startRecord">Start Recording</button>
+            <button id="stopRecord" disabled>Stop Recording</button>
+            <p id="recordingStatus">🎙️ Click 'Start Recording' to begin.</p>
+            <h3>✅ Live Transcription:</h3>
+            <p id="liveTranscription">Your live transcription will appear here...</p>
+        </div>
+
+        <!-- 🔊 TTS Section -->
+        <div class="section">
+            <h2>🔊 Text-to-Speech (TTS)</h2>
+            <p>Enter text and convert it to speech.</p>
+            <textarea id="ttsText" placeholder="Enter text to convert to speech..."></textarea>
+            <br>
+            <button id="convertSpeech">Convert to Speech</button>
+            <h3>🎧 Audio Output:</h3>
+            <audio id="audioPlayer" controls></audio>
+        </div>
+    </div>
+
+    
+    <script>
+        // 🎤 Speech-to-Text (STT) File Upload Fix
+        document.getElementById("uploadFile").addEventListener("click", async () => {
+            let fileInput = document.getElementById("audioFile");
+            if (fileInput.files.length === 0) {
+                alert("⚠️ Please select an audio file.");
+                return;
+            }
+
+            let formData = new FormData();
+            formData.append("file", fileInput.files[0]);
+
+            try {
+                let response = await fetch("/transcribe/", {
+                    method: "POST",
+                    body: formData
+                });
+
+                let result = await response.json();
+                document.getElementById("transcriptionResult").innerText = result.transcription;
+            } catch (error) {
+                document.getElementById("transcriptionResult").innerText = "❌ Network Error!";
+            }
+        });
+
+        let mediaRecorder;
+        let audioChunks = [];
+
+        // 🎙 Start Recording Fix
+        document.getElementById("startRecord").addEventListener("click", async () => {
+            let stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+            mediaRecorder = new MediaRecorder(stream);
+
+            mediaRecorder.ondataavailable = event => {
+                audioChunks.push(event.data);
+            };
+
+            mediaRecorder.start();
+            document.getElementById("recordingStatus").innerText = "🎙️ Recording...";
+            document.getElementById("startRecord").disabled = true;
+            document.getElementById("stopRecord").disabled = false;
+        });
+
+        // ⏹ Stop Recording & Send to Backend (Fixes Live Text Placement)
+        document.getElementById("stopRecord").addEventListener("click", async () => {
+            mediaRecorder.stop();
+            document.getElementById("recordingStatus").innerText = "✅ Recording Stopped!";
+            document.getElementById("startRecord").disabled = false;
+            document.getElementById("stopRecord").disabled = true;
+
+            mediaRecorder.onstop = async () => {
+                const audioBlob = new Blob(audioChunks, { type: "audio/wav" });
+                const formData = new FormData();
+                formData.append("file", audioBlob, "recorded_audio.wav");
+
+                document.getElementById("recordingStatus").innerText = "⏳ Processing...";
+
+                try {
+                    let response = await fetch("/transcribe/", {
+                        method: "POST",
+                        body: formData
+                    });
+
+                    let result = await response.json();
+                    document.getElementById("liveTranscription").innerText = result.transcription;
+                } catch (error) {
+                    document.getElementById("liveTranscription").innerText = "❌ Network Error!";
+                }
+            };
+        });
+
+        // 🔊 Text-to-Speech Fix
+        document.getElementById("convertSpeech").addEventListener("click", async () => {
+            let text = document.getElementById("ttsText").value;
+            if (!text) {
+                alert("⚠️ Please enter text for speech synthesis.");
+                return;
+            }
+
+            let response = await fetch("/tts/", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ text: text })
+            });
+
+            let result = await response.json();
+            let audioUrl = result.audio_url;
+
+            // 🛠 Fix: Update <audio> source and play
+            document.getElementById("audioPlayer").src = audioUrl;
+            document.getElementById("audioPlayer").play();
+        });
+    </script>
+    
+</body>
+</html>
