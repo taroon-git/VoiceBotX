@@ -44,7 +44,7 @@ This project is a **Voice Chatbot** built using FastAPI that integrates:
 ---
 
 ## 📁 Project Structure
-```
+
 📂 fastapi-stt
 │── 📂 app
 │   ├── 📜 main.py        # FastAPI entry point
@@ -58,7 +58,7 @@ This project is a **Voice Chatbot** built using FastAPI that integrates:
 │── 📂 recordings         # Stores recorded audio files
 │── 📜 README.md          # Documentation
 │── 📜 requirements.txt   # Dependencies
-```
+
 
 ---
 
